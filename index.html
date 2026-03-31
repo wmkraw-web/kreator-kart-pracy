@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduKarty AI - Generator Kart Pracy</title>
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Patrick+Hand&family=Quicksand:wght@400;600;700&display=swap');
+        
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        .font-patrick { font-family: 'Patrick Hand', cursive; }
+        .font-quicksand { font-family: 'Quicksand', sans-serif; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        /* A4 aspect ratio and styling */
+        .a4-container {
+            aspect-ratio: 1 / 1.414;
+            background-color: white;
+            width: 100%;
+            max-width: 800px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+            margin: 0 auto;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; border: none !important; margin: 0 !important; box-shadow: none !important; }
+            .print-hidden { display: none !important; }
+            body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; background: white; }
+            .a4-container { max-width: none; aspect-ratio: auto; height: 100vh; }
+        }
+        
+        .writing-line {
+            border-bottom: 2px dashed #94a3b8;
+            height: 2.5rem;
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+        
+        .tracing-text {
+            color: transparent;
+            -webkit-text-stroke: 1.5px #94a3b8;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- IKONY SVG ---
+        const Icon = ({ name, size = 24, className = "" }) => {
+            const icons = {
+                Printer: <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/>,
+                Coffee: <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM7 2v3M11 2v3M15 2v3"/>,
+                Key: <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3y-3.5L15.5 7.5z"/>,
+                Plus: <path d="M12 5v14M5 12h14"/>,
+                Trash: <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/>,
+                Image: <><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></>,
+                Type: <><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></>,
+                Calculator: <><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></>,
+                AlignLeft: <><line x1="21" x2="3" y1="6" y2="6"/><line x1="15" x2="3" y1="12" y2="12"/><line x1="17" x2="3" y1="18" y2="18"/></>,
+                Sparkles: <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>,
+                PenTool: <><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></>,
+                FileText: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
+                Square: <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>,
+                Grid: <><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></>
+            };
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    {icons[name] || null}
+                </svg>
+            );
+        };
+
+        // --- POMOCNICZE GENEROWANIE MATEMATYKI ---
+        const generateMathProblems = (operation, range, count) => {
+            const problems = [];
+            for(let i=0; i<count; i++) {
+                let a, b;
+                if(operation === '+') {
+                    a = Math.floor(Math.random() * (range/2)) + 1;
+                    b = Math.floor(Math.random() * (range/2)) + 1;
+                } else if(operation === '-') {
+                    a = Math.floor(Math.random() * range) + 1;
+                    b = Math.floor(Math.random() * a) + 1; // b <= a żeby nie było ujemnych
+                } else if(operation === '*') {
+                    let maxFactor = Math.floor(Math.sqrt(range));
+                    if (range === 100) maxFactor = 10; // tabliczka mnozenia do 100
+                    a = Math.floor(Math.random() * maxFactor) + 1;
+                    b = Math.floor(Math.random() * maxFactor) + 1;
+                }
+                problems.push(`${a} ${operation} ${b} = `);
+            }
+            return problems;
+        };
+
+        // --- FUNKCJA RENDEROWANIA LUK W TEKŚCIE ---
+        const renderTextWithGaps = (text) => {
+            if (!text) return null;
+            // Dzielimy tekst po nawiasach kwadratowych np. "Ala ma [kota]"
+            const parts = text.split(/\[(.*?)\]/g);
+            return parts.map((part, i) => {
+                if (i % 2 === 1) { 
+                    // To jest luka
+                    return (
+                        <span key={i} className="inline-block border-b-2 border-slate-400 mx-1 px-4 text-transparent min-w-[4rem] text-center align-bottom" style={{lineHeight: '1.2'}}>
+                            {part}
+                        </span>
+                    );
+                }
+                return <span key={i}>{part}</span>;
+            });
+        };
+
+        function App() {
+            const [isPremium, setIsPremium] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            
+            // Konfiguracja Karty
+            const [docTitle, setDocTitle] = useState('KARTA PRACY');
+            const [docSubtitle, setDocSubtitle] = useState('Temat: Wiosenne porządki');
+            const [fontFamily, setFontFamily] = useState('font-quicksand');
+            
+            // Bloki (cegiełki karty pracy)
+            const [blocks, setBlocks] = useState([
+                { id: '1', type: 'instruction', text: 'Napisz pięknie po śladzie:' },
+                { id: '2', type: 'tracing', word: 'Wiosna', count: 4 },
+                { id: '3', type: 'instruction', text: 'Uzupełnij luki w poniższym tekście:' },
+                { id: '4', type: 'gaps', text: 'Wiosną na łące kwitną kolorowe [kwiaty]. Dzieci biegają z wesołym [psem], a na niebie świeci jasne [słońce].' },
+                { id: '5', type: 'instruction', text: 'Narysuj swój ulubiony owoc:' },
+                { id: '6', type: 'drawing', height: 150 }
+            ]);
+
+            const handleVerifyCode = () => {
+                if (accessCode.toUpperCase() === 'KAWA2024') { setIsPremium(true); setAccessCode(''); }
+                else alert('Nieprawidłowy kod!');
+            };
+
+            // --- ZARZĄDZANIE BLOKAMI ---
+            const addBlock = (type) => {
+                const newId = Date.now().toString();
+                let newBlock = { id: newId, type };
+                
+                if(type === 'instruction') newBlock.text = 'Wpisz polecenie...';
+                if(type === 'lines') newBlock.count = 3;
+                if(type === 'math') newBlock = { ...newBlock, operation: '+', range: 20, count: 8, problems: generateMathProblems('+', 20, 8) };
+                if(type === 'ai_image') newBlock = { ...newBlock, prompt: '', imageUrl: null, isLoading: false };
+                if(type === 'tracing') newBlock = { ...newBlock, word: 'Słowo', count: 5 };
+                if(type === 'gaps') newBlock = { ...newBlock, text: 'Wklej tekst. Użyj nawiasów kwadratowych np. [tutaj], aby stworzyć lukę do uzupełnienia.' };
+                if(type === 'drawing') newBlock = { ...newBlock, height: 200 };
+                if(type === 'grid') newBlock = { ...newBlock, rows: 5, cols: 5 };
+                
+                setBlocks([...blocks, newBlock]);
+            };
+
+            const removeBlock = (id) => {
+                setBlocks(blocks.filter(b => b.id !== id));
+            };
+
+            const updateBlock = (id, updates) => {
+                setBlocks(blocks.map(b => b.id === id ? { ...b, ...updates } : b));
+            };
+
+            // --- AI DO KOLOROWANEK ---
+            const generateBlockAIImage = async (id, prompt) => {
+                if (!prompt) return;
+                
+                updateBlock(id, { isLoading: true });
+                
+                try {
+                    const aiPrompt = `${prompt}, pure black and white coloring page, clean line art, absolutely no shading, no grayscale, pure white background, flat 2d vector, thick outlines, child friendly`;
+                    const encodedPrompt = encodeURIComponent(aiPrompt);
+                    const seed = Math.floor(Math.random() * 1000000);
+                    // Używamy super szybkiego modelu FLUX
+                    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=500&nologo=true&seed=${seed}&model=flux`;
+                    
+                    const img = new Image();
+                    img.onload = () => {
+                        updateBlock(id, { imageUrl, isLoading: false });
+                    };
+                    img.onerror = () => {
+                        alert('Błąd podczas generowania. Spróbuj ponownie.');
+                        updateBlock(id, { isLoading: false });
+                    };
+                    img.src = imageUrl;
+                } catch (error) {
+                    console.error(error);
+                    updateBlock(id, { isLoading: false });
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col font-sans">
+                    {/* Nawigacja Górna */}
+                    <nav className="bg-white border-b px-8 py-4 flex justify-between items-center print-hidden sticky top-0 z-50 shadow-sm">
+                        <div className="flex items-center space-x-3 font-black text-2xl tracking-tight">
+                            <div className="bg-indigo-600 p-2.5 rounded-xl text-white shadow-lg shadow-indigo-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+                            </div>
+                            <span className="text-gray-800">EduKarty <span className="text-indigo-600">AI</span></span>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            {!isPremium && (
+                                <div className="hidden sm:flex items-center space-x-2 bg-gray-50 p-1.5 rounded-xl border border-gray-200">
+                                    <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod Premium..." className="p-2 bg-transparent text-sm w-32 outline-none font-medium text-gray-700"/>
+                                    <button onClick={handleVerifyCode} className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-colors"><Icon name="Key" size={16}/></button>
+                                </div>
+                            )}
+                            <button onClick={() => window.open('https://buycoffee.to/magiccolor')} className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-yellow-900 px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all active:scale-95">
+                                <Icon name="Coffee" size={20} /><span>{isPremium ? "Dzięki za Kawę!" : "Postaw Kawę"}</span>
+                            </button>
+                        </div>
+                    </nav>
+
+                    <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full print:block print:p-0">
+                        
+                        {/* --- LEWY PANEL (NARZĘDZIA) --- */}
+                        <div className="lg:col-span-5 space-y-6 print-hidden flex flex-col h-full">
+                            
+                            {/* Konfiguracja Ogólna */}
+                            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-4">
+                                <h2 className="font-bold flex items-center text-slate-800 uppercase tracking-widest text-xs mb-4"><Icon name="AlignLeft" size={18} className="mr-2 text-indigo-500"/> Ustawienia Strony</h2>
+                                
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Tytuł Karty</label>
+                                    <input type="text" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 font-bold" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Podtytuł / Temat</label>
+                                    <input type="text" value={docSubtitle} onChange={e => setDocSubtitle(e.target.value)} className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">Czcionka</label>
+                                    <select value={fontFamily} onChange={e => setFontFamily(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl outline-none bg-slate-50">
+                                        <option value="font-quicksand">Quicksand (Czytelna, nowoczesna)</option>
+                                        <option value="font-patrick">Patrick Hand (Wyglądająca jak pismo odręczne)</option>
+                                        <option value="font-sans">Montserrat (Klasyczna)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Dodawanie Bloków - ROZBUDOWANE */}
+                            <div className="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100">
+                                <h2 className="font-bold flex items-center text-indigo-900 uppercase tracking-widest text-xs mb-4">Dodaj element do karty</h2>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={() => addBlock('instruction')} className="flex items-center justify-start gap-3 p-3 bg-white border border-indigo-200 rounded-xl font-bold text-sm text-indigo-700 hover:bg-indigo-50 transition shadow-sm">
+                                        <Icon name="Type" size={18}/> Polecenie
+                                    </button>
+                                    <button onClick={() => addBlock('gaps')} className="flex items-center justify-start gap-3 p-3 bg-white border border-indigo-200 rounded-xl font-bold text-sm text-indigo-700 hover:bg-indigo-50 transition shadow-sm">
+                                        <Icon name="FileText" size={18}/> Tekst z lukami
+                                    </button>
+                                    
+                                    <button onClick={() => addBlock('math')} className="flex items-center justify-start gap-3 p-3 bg-white border border-indigo-200 rounded-xl font-bold text-sm text-indigo-700 hover:bg-indigo-50 transition shadow-sm">
+                                        <Icon name="Calculator" size={18}/> Matematyka
+                                    </button>
+                                    <button onClick={() => addBlock('tracing')} className="flex items-center justify-start gap-3 p-3 bg-white border border-indigo-200 rounded-xl font-bold text-sm text-indigo-700 hover:bg-indigo-50 transition shadow-sm">
+                                        <div className="text-slate-400"><Icon name="PenTool" size={18}/></div> Po śladzie
+                                    </button>
+                                    
+                                    <button onClick={() => addBlock('lines')} className="flex items-center justify-start gap-3 p-3 bg-white border border-indigo-200 rounded-xl font-bold text-sm text-indigo-700 hover:bg-indigo-50 transition shadow-sm">
+                                        <Icon name="AlignLeft" size={18}/> Linie do pisania
+                                    </button>
+                                    <button onClick={() => addBlock('grid')} className="flex items-center justify-start gap-3 p-3 bg-white border border-indigo-200 rounded-xl font-bold text-sm text-indigo-700 hover:bg-indigo-50 transition shadow-sm">
+                                        <Icon name="Grid" size={18}/> Kratownica
+                                    </button>
+
+                                    <button onClick={() => addBlock('drawing')} className="flex items-center justify-start gap-3 p-3 bg-white border border-indigo-200 rounded-xl font-bold text-sm text-indigo-700 hover:bg-indigo-50 transition shadow-sm col-span-2">
+                                        <Icon name="Square" size={18}/> Puste miejsce na rysunek
+                                    </button>
+
+                                    <button onClick={() => addBlock('ai_image')} className="flex items-center justify-center gap-2 p-3 bg-indigo-600 border border-indigo-700 rounded-xl font-bold text-sm text-white hover:bg-indigo-700 transition shadow-sm col-span-2">
+                                        <Icon name="Sparkles" size={18}/> Kolorowanka z AI (Sztuczna Inteligencja)
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Lista aktywnych bloków (Edycja) */}
+                            <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2 pb-4">
+                                {blocks.map((block, index) => (
+                                    <div key={block.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative group">
+                                        <button onClick={() => removeBlock(block.id)} className="absolute top-3 right-3 text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Icon name="Trash" size={16}/>
+                                        </button>
+                                        
+                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 border-b pb-2 flex items-center">
+                                            Element {index + 1}: &nbsp;
+                                            <span className="text-indigo-600">
+                                                {block.type === 'instruction' && 'Polecenie'}
+                                                {block.type === 'gaps' && 'Tekst z lukami'}
+                                                {block.type === 'math' && 'Matematyka'}
+                                                {block.type === 'tracing' && 'Pisanie po śladzie'}
+                                                {block.type === 'lines' && 'Linie do pisania'}
+                                                {block.type === 'drawing' && 'Miejsce na rysunek'}
+                                                {block.type === 'grid' && 'Kratownica'}
+                                                {block.type === 'ai_image' && 'Kolorowanka AI'}
+                                            </span>
+                                        </div>
+
+                                        {/* Edytor: Polecenie */}
+                                        {block.type === 'instruction' && (
+                                            <textarea value={block.text} onChange={e => updateBlock(block.id, {text: e.target.value})} rows="2" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm resize-none focus:border-indigo-400" />
+                                        )}
+
+                                        {/* Edytor: Tekst z lukami */}
+                                        {block.type === 'gaps' && (
+                                            <div>
+                                                <textarea value={block.text} onChange={e => updateBlock(block.id, {text: e.target.value})} rows="4" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm resize-none focus:border-indigo-400" />
+                                                <p className="text-[10px] text-slate-400 mt-2 font-medium">Użyj nawiasów kwadratowych np. <span className="font-bold text-indigo-500">[pies]</span>, aby zmienić to słowo w wykropkowaną lukę do uzupełnienia.</p>
+                                            </div>
+                                        )}
+
+                                        {/* Edytor: Po śladzie (Tracing) */}
+                                        {block.type === 'tracing' && (
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Słowo do napisania</label>
+                                                    <input type="text" value={block.word} onChange={e => updateBlock(block.id, {word: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-indigo-400 font-bold" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Ile razy powtórzyć: {block.count}</label>
+                                                    <input type="range" min="1" max="10" value={block.count} onChange={e => updateBlock(block.id, {count: Number(e.target.value)})} className="w-full accent-indigo-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer" />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Edytor: Miejsce na rysunek */}
+                                        {block.type === 'drawing' && (
+                                            <div>
+                                                <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Wysokość okienka (piksele): {block.height}</label>
+                                                <input type="range" min="50" max="600" step="10" value={block.height} onChange={e => updateBlock(block.id, {height: Number(e.target.value)})} className="w-full accent-indigo-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer" />
+                                            </div>
+                                        )}
+
+                                        {/* Edytor: Kratownica */}
+                                        {block.type === 'grid' && (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Rzędy (w dół): {block.rows}</label>
+                                                    <input type="range" min="1" max="20" value={block.rows} onChange={e => updateBlock(block.id, {rows: Number(e.target.value)})} className="w-full accent-indigo-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Kolumny (w bok): {block.cols}</label>
+                                                    <input type="range" min="1" max="20" value={block.cols} onChange={e => updateBlock(block.id, {cols: Number(e.target.value)})} className="w-full accent-indigo-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer" />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Edytor: Matematyka */}
+                                        {block.type === 'math' && (
+                                            <div className="space-y-3">
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Działanie</label>
+                                                        <select value={block.operation} onChange={e => updateBlock(block.id, {operation: e.target.value})} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none">
+                                                            <option value="+">Dodawanie (+)</option>
+                                                            <option value="-">Odejmowanie (-)</option>
+                                                            <option value="*">Mnożenie (×)</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Zakres (do ilu)</label>
+                                                        <select value={block.range} onChange={e => updateBlock(block.id, {range: Number(e.target.value)})} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none">
+                                                            <option value="10">Do 10</option>
+                                                            <option value="20">Do 20</option>
+                                                            <option value="100">Do 100</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Liczba zadań: {block.count}</label>
+                                                    <input type="range" min="4" max="24" step="4" value={block.count} onChange={e => updateBlock(block.id, {count: Number(e.target.value)})} className="w-full accent-indigo-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer" />
+                                                </div>
+                                                <button onClick={() => updateBlock(block.id, {problems: generateMathProblems(block.operation, block.range, block.count)})} className="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-700 transition">
+                                                    🔀 Wygeneruj nowe przykłady
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Edytor: Linie */}
+                                        {block.type === 'lines' && (
+                                            <div>
+                                                <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Liczba linijek: {block.count}</label>
+                                                <input type="range" min="1" max="10" value={block.count} onChange={e => updateBlock(block.id, {count: Number(e.target.value)})} className="w-full accent-indigo-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer" />
+                                            </div>
+                                        )}
+
+                                        {/* Edytor: Obrazek AI */}
+                                        {block.type === 'ai_image' && (
+                                            <div className="space-y-3">
+                                                {!isPremium ? (
+                                                    <div className="bg-purple-50 p-3 rounded-xl border border-purple-100 text-center">
+                                                        <p className="text-xs font-bold text-purple-800 mb-1">Funkcja Premium (Kłódka)</p>
+                                                        <p className="text-[10px] text-purple-600">Wpisz kod na górnym pasku, aby móc generować obrazki.</p>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div>
+                                                            <label className="text-[9px] font-bold text-slate-400 uppercase">Co chcesz narysować do pokolorowania?</label>
+                                                            <input type="text" placeholder="np. Słodki dinozaur z balonem" value={block.prompt} onChange={e => updateBlock(block.id, {prompt: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-purple-400" />
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => generateBlockAIImage(block.id, block.prompt)} 
+                                                            disabled={block.isLoading || !block.prompt}
+                                                            className="w-full py-2.5 bg-purple-600 text-white rounded-xl text-xs font-bold hover:bg-purple-700 transition disabled:bg-slate-400 flex justify-center items-center gap-2"
+                                                        >
+                                                            {block.isLoading ? '⏳ Rysowanie (Tryb Turbo)...' : <><Icon name="Sparkles" size={14}/> Wygeneruj Rysunek</>}
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            <button onClick={() => window.print()} className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black text-sm tracking-widest flex items-center justify-center space-x-3 shadow-xl shadow-indigo-200 transition-all active:scale-95 shrink-0">
+                                <Icon name="Printer" size={22} /><span>WYDRUKUJ KARTĘ PRACY</span>
+                            </button>
+                        </div>
+
+                        {/* --- PRAWY PANEL (PODGLĄD A4) --- */}
+                        <div className="lg:col-span-7 flex justify-center items-start lg:sticky lg:top-28 self-start print:static w-full">
+                            
+                            <div id="print-area" className={`a4-container ${fontFamily} relative`}>
+                                
+                                {/* Marginesy i zawartość Karty */}
+                                <div className="p-8 md:p-12 h-full flex flex-col">
+                                    
+                                    {/* Nagłówek Karty Pracy */}
+                                    <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-6 shrink-0">
+                                        <div>
+                                            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">{docTitle}</h1>
+                                            <h2 className="text-lg md:text-xl text-slate-600 mt-1 font-semibold">{docSubtitle}</h2>
+                                        </div>
+                                        <div className="flex flex-col gap-3 w-48 text-sm md:text-base text-slate-700">
+                                            <div className="flex items-end gap-2 border-b border-slate-400 pb-1">
+                                                <span className="font-bold">Imię:</span><span className="flex-1"></span>
+                                            </div>
+                                            <div className="flex items-end gap-2 border-b border-slate-400 pb-1">
+                                                <span className="font-bold">Data:</span><span className="flex-1"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Obszar roboczy (bloki) */}
+                                    <div className="flex-1 flex flex-col gap-6 overflow-hidden">
+                                        {blocks.length === 0 && <div className="text-center text-slate-300 mt-20 font-bold print-hidden">Brak elementów. Dodaj coś z lewego panelu.</div>}
+                                        
+                                        {blocks.map((block) => (
+                                            <div key={block.id} className="w-full">
+                                                
+                                                {block.type === 'instruction' && (
+                                                    <p className="text-lg md:text-xl text-slate-800 font-bold mb-2">📌 {block.text}</p>
+                                                )}
+
+                                                {block.type === 'gaps' && (
+                                                    <p className="text-lg md:text-xl text-slate-800 leading-relaxed text-justify px-2">
+                                                        {renderTextWithGaps(block.text)}
+                                                    </p>
+                                                )}
+
+                                                {block.type === 'tracing' && (
+                                                    <div className="flex flex-wrap gap-x-8 gap-y-4 px-2 mt-4 font-patrick text-4xl tracing-text">
+                                                        {Array.from({ length: block.count }).map((_, i) => (
+                                                            <span key={i}>{block.word}</span>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {block.type === 'drawing' && (
+                                                    <div className="w-full border-2 border-slate-300 rounded-xl mt-2" style={{ height: `${block.height}px` }}>
+                                                    </div>
+                                                )}
+
+                                                {block.type === 'grid' && (
+                                                    <div className="w-full mt-2 overflow-hidden flex justify-center">
+                                                        <table className="border-collapse">
+                                                            <tbody>
+                                                                {Array.from({ length: block.rows }).map((_, r) => (
+                                                                    <tr key={r}>
+                                                                        {Array.from({ length: block.cols }).map((_, c) => (
+                                                                            <td key={c} className="border border-slate-400 w-10 h-10 md:w-12 md:h-12 bg-white"></td>
+                                                                        ))}
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                )}
+
+                                                {block.type === 'math' && (
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-6 text-xl md:text-2xl mt-4 px-4 font-semibold text-slate-800">
+                                                        {block.problems?.map((prob, i) => (
+                                                            <div key={i} className="flex justify-start">{prob}</div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {block.type === 'lines' && (
+                                                    <div className="mt-4 w-full px-4">
+                                                        {Array.from({ length: block.count }).map((_, i) => (
+                                                            <div key={i} className="writing-line"></div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {block.type === 'ai_image' && (
+                                                    <div className="w-full flex justify-center mt-4 mb-4">
+                                                        {block.imageUrl ? (
+                                                            <img src={block.imageUrl} className="max-w-full max-h-[350px] object-contain border-2 border-slate-100 p-4 rounded-2xl print:border-none print:p-0" alt="Kolorowanka" />
+                                                        ) : (
+                                                            <div className="w-full h-48 border-4 border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-slate-400 font-bold print:hidden">
+                                                                [ Miejsce na obrazek AI ]
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Stopka Karty Pracy */}
+                                    <div className="mt-auto pt-4 text-center text-slate-300 text-xs font-bold print:text-slate-400 shrink-0">
+                                        Stworzono w EduKarty AI
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
