@@ -22,10 +22,10 @@
             letter-spacing: 0.2em;
         }
 
-        .math-text {
+        .math-text, .kids-font {
             font-family: 'Comic Neue', cursive;
             font-weight: bold;
-            color: #334155;
+            color: #1e293b;
         }
 
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
@@ -38,6 +38,7 @@
             #print-area { position: absolute; left: 0; top: 0; width: 100%; border: none !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important;}
             .print-hidden { display: none !important; }
             body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; background: white; }
+            .page-break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
         }
     </style>
 </head>
@@ -58,7 +59,11 @@
                 Trash2: (<><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>),
                 Calculator: (<><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></>),
                 Type: (<><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></>),
-                Layout: (<><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></>)
+                Layout: (<><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></>),
+                Image: (<><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>),
+                Link: (<><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></>),
+                Star: (<><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></>),
+                Text: (<><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></>)
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -67,7 +72,6 @@
             );
         };
 
-        // --- TARCZA OCHRONNA (System ponawiania pobierania obrazka) ---
         const fetchImageWithRetry = async (url, maxRetries = 3) => {
             for (let i = 0; i < maxRetries; i++) {
                 try {
@@ -80,11 +84,7 @@
                 } catch (error) {
                     console.warn(`Próba ${i + 1}: Błąd połączenia internetowego.`);
                 }
-                
-                if (i < maxRetries - 1) {
-                    // Czekamy 2 sekundy przed kolejną próbą
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                }
+                if (i < maxRetries - 1) await new Promise(resolve => setTimeout(resolve, 2000));
             }
             throw new Error("Serwer AI jest przeciążony. Spróbuj ponownie.");
         };
@@ -93,80 +93,75 @@
             const [isPremium, setIsPremium] = useState(false);
             const [accessCode, setAccessCode] = useState('');
             
-            // Dane Karty Pracy
-            const [worksheetTitle, setWorksheetTitle] = useState('KARTA PRACY');
-            const [worksheetSubtitle, setWorksheetSubtitle] = useState('Imię i nazwisko: ........................................');
+            // --- DANE IDENTYFIKACYJNE (NAGŁÓWEK MEN) ---
+            const [headerData, setHeaderData] = useState({
+                school: 'Przedszkole / Szkoła: .......................................',
+                name: 'Imię i nazwisko: ................................................',
+                date: 'Data: .................',
+                group: 'Grupa/Klasa: .................',
+                title: 'DZIEŃ ZIEMI - DBAMY O PLANETĘ',
+                goal: 'Cel: Poznanie sposobów dbania o Ziemię, ćwiczenie liczenia i motoryki małej.'
+            });
             
-            // Elementy na karcie (Bloki)
+            // --- ELEMENTY (BLOKI) KARTY ---
             const [elements, setElements] = useState([
-                { id: 1, type: 'tracing', text: 'WIOSNA' },
-                { id: 2, type: 'math', data: ['5 + 3 = ...', '7 - 2 = ...', '4 + 4 = ...', '9 - 5 = ...'] }
+                { id: 1, type: 'instruction', text: 'Zadanie 1. Policz ile jest owoców i wpisz wynik.' },
+                { id: 2, type: 'image_math', icon: '🍎', eq1: 3, op: '+', eq2: 2 },
+                { id: 3, type: 'instruction', text: 'Zadanie 2. Połącz w pary pasujące do siebie elementy.' },
+                { id: 4, type: 'match', pairs: [{l: 'Papier', r: 'Niebieski kosz'}, {l: 'Szkło', r: 'Zielony kosz'}, {l: 'Plastik', r: 'Żółty kosz'}] },
+                { id: 5, type: 'motivation', text: 'Brawo! Wspaniała robota! Jesteś przyjacielem Ziemi!' }
             ]);
 
-            // Stan modułu AI
             const [aiPrompt, setAiPrompt] = useState('');
             const [isGenerating, setIsGenerating] = useState(false);
             const [aiError, setAiError] = useState(null);
 
             const handleVerifyCode = () => {
-                if (accessCode.toUpperCase() === 'KAWA2024') { 
-                    setIsPremium(true); 
-                    setAccessCode(''); 
-                } else { 
-                    alert('Nieprawidłowy kod!'); 
-                }
+                if (accessCode.toUpperCase() === 'KAWA2024') { setIsPremium(true); setAccessCode(''); } 
+                else { alert('Nieprawidłowy kod!'); }
             };
 
-            // Dodawanie bloków
-            const addMathBlock = () => {
-                const generateEq = () => {
-                    const op = Math.random() > 0.5 ? '+' : '-';
-                    const a = Math.floor(Math.random() * 10) + 1;
-                    const b = Math.floor(Math.random() * a); 
-                    return op === '+' ? `${a} + ${b} = ...` : `${a} - ${b} = ...`;
-                };
-                const newMath = [generateEq(), generateEq(), generateEq(), generateEq()];
-                setElements([...elements, { id: Date.now(), type: 'math', data: newMath }]);
+            const updateHeader = (field, value) => {
+                setHeaderData({...headerData, [field]: value});
             };
 
-            const addTracingBlock = () => {
-                setElements([...elements, { id: Date.now(), type: 'tracing', text: 'WPISZ TEKST' }]);
+            const updateElement = (id, field, value, index = null, subfield = null) => {
+                setElements(elements.map(el => {
+                    if (el.id !== id) return el;
+                    if (index !== null) {
+                        const newArray = [...el[field]];
+                        newArray[index][subfield] = value;
+                        return { ...el, [field]: newArray };
+                    }
+                    return { ...el, [field]: value };
+                }));
             };
 
-            const addSpacer = () => {
-                setElements([...elements, { id: Date.now(), type: 'spacer' }]);
-            };
+            const removeElement = (id) => setElements(elements.filter(el => el.id !== id));
 
-            const updateElementText = (id, newText) => {
-                setElements(elements.map(el => el.id === id ? { ...el, text: newText } : el));
-            };
+            // --- DODAWANIE NOWYCH BLOKÓW ---
+            const addInstruction = () => setElements([...elements, { id: Date.now(), type: 'instruction', text: 'Zadanie. Wpisz treść polecenia...' }]);
+            const addImageMath = () => setElements([...elements, { id: Date.now(), type: 'image_math', icon: '⭐', eq1: 2, op: '+', eq2: 2 }]);
+            const addMath = () => setElements([...elements, { id: Date.now(), type: 'math', data: ['5 + 3 = ...', '7 - 2 = ...', '4 + 4 = ...', '9 - 5 = ...'] }]);
+            const addTracing = () => setElements([...elements, { id: Date.now(), type: 'tracing', text: 'WPISZ TEKST' }]);
+            const addMatch = () => setElements([...elements, { id: Date.now(), type: 'match', pairs: [{l: 'A', r: '1'}, {l: 'B', r: '2'}, {l: 'C', r: '3'}] }]);
+            const addMotivation = () => setElements([...elements, { id: Date.now(), type: 'motivation', text: 'Brawo! Jesteś super! ⭐' }]);
+            const addSpacer = () => setElements([...elements, { id: Date.now(), type: 'spacer' }]);
 
-            const removeElement = (id) => {
-                setElements(elements.filter(el => el.id !== id));
-            };
-
-            // Generowanie Kolorowanki AI
+            // --- GENERATOR AI ---
             const handleGenerateAiImage = async () => {
                 if (!aiPrompt.trim()) return;
-                setIsGenerating(true);
-                setAiError(null);
-                
+                setIsGenerating(true); setAiError(null);
                 let translatedPrompt = aiPrompt;
                 
-                // Tłumaczenie na angielski (dla lepszych efektów AI)
                 try {
                     const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(aiPrompt)}&langpair=pl|en`);
                     const data = await res.json();
-                    if (data && data.responseData && data.responseData.translatedText) {
-                        if(!data.responseData.translatedText.includes("MYMEMORY WARNING")){
-                            translatedPrompt = data.responseData.translatedText;
-                        }
+                    if (data?.responseData?.translatedText && !data.responseData.translatedText.includes("MYMEMORY WARNING")) {
+                        translatedPrompt = data.responseData.translatedText;
                     }
-                } catch(e) {
-                    console.log("Błąd tłumaczenia, używamy oryginału");
-                }
+                } catch(e) {}
 
-                // Ścisłe wymuszenie kolorowanki (bez cieni, czarno-białe)
                 const fullPrompt = `${translatedPrompt}, black and white coloring page for kids, line art, simple outlines, pure white background, no shading, monochrome`;
                 
                 try {
@@ -174,20 +169,23 @@
                     const encodedPrompt = encodeURIComponent(fullPrompt);
                     const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&seed=${seed}&model=flux&r=${Date.now()}`;
                     
-                    // UŻYCIE TARCZY OCHRONNEJ
                     const blob = await fetchImageWithRetry(imageUrl, 3);
                     const objectUrl = URL.createObjectURL(blob);
                     
-                    // Dodanie wygenerowanego obrazka do karty
                     setElements([...elements, { id: Date.now(), type: 'ai_image', src: objectUrl }]);
                     setAiPrompt('');
                     setIsGenerating(false);
-
                 } catch (e) { 
                     setIsGenerating(false);
-                    console.error(e);
                     setAiError("Darmowe serwery są w tej chwili obciążone. Odczekaj 10 sekund i spróbuj ponownie!");
                 }
+            };
+
+            // Pomocnicza funkcja do rysowania obrazków w matematyce
+            const renderImageMathIcons = (icon, count) => {
+                return Array.from({ length: count }).map((_, i) => (
+                    <span key={i} className="text-3xl md:text-4xl mx-1">{icon}</span>
+                ));
             };
 
             return (
@@ -196,7 +194,7 @@
                     <nav className="bg-white border-b px-8 py-4 flex justify-between items-center print-hidden sticky top-0 z-50 shadow-sm">
                         <div className="flex items-center space-x-3 font-black text-2xl tracking-tight">
                             <div className="bg-gradient-to-br from-amber-400 to-orange-500 p-2.5 rounded-xl text-white shadow-lg"><Icon name="Layout" size={24}/></div>
-                            <span className="text-gray-800">Edu<span className="text-orange-500">Karty</span> <span className="text-xs text-orange-600 ml-1 font-bold bg-orange-50 px-2 py-1 rounded-md border border-orange-200">v2.0 Stabilna</span></span>
+                            <span className="text-gray-800">Edu<span className="text-orange-500">Karty</span> <span className="text-xs text-orange-600 ml-1 font-bold bg-orange-50 px-2 py-1 rounded-md border border-orange-200">v3.0 Standard MEN</span></span>
                         </div>
                         <div className="flex items-center space-x-4">
                             {!isPremium && (
@@ -213,39 +211,58 @@
 
                     <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full print:block print:p-0">
                         
-                        {/* PANEL BOCZNY (Narzędzia) */}
+                        {/* PANEL BOCZNY */}
                         <div className="lg:col-span-4 space-y-5 print-hidden flex flex-col">
                             
-                            <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 space-y-5 relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
-                                <h2 className="font-bold flex items-center text-gray-800 text-sm uppercase tracking-widest"><Icon name="Type" size={18} className="mr-2 text-orange-500"/> Nagłówek Karty</h2>
-                                
-                                <div>
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Tytuł główny</label>
-                                    <input type="text" value={worksheetTitle} onChange={e => setWorksheetTitle(e.target.value)} className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-400 focus:bg-white transition-colors font-bold text-center" />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Miejsce na imię</label>
-                                    <input type="text" value={worksheetSubtitle} onChange={e => setWorksheetSubtitle(e.target.value)} className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-orange-400 focus:bg-white transition-colors text-center text-sm" />
-                                </div>
-                            </div>
-
+                            {/* EDYCJA NAGŁÓWKA */}
                             <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 space-y-4 relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-1 h-full bg-sky-500"></div>
-                                <h2 className="font-bold flex items-center text-gray-800 text-sm uppercase tracking-widest"><Icon name="Layout" size={18} className="mr-2 text-sky-500"/> Dodaj Moduły</h2>
+                                <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
+                                <h2 className="font-bold flex items-center text-gray-800 text-sm uppercase tracking-widest"><Icon name="Type" size={18} className="mr-2 text-orange-500"/> Dane Identyfikacyjne</h2>
                                 
-                                <button onClick={addMathBlock} className="w-full py-3 px-4 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-xl font-bold border border-sky-200 flex items-center justify-center gap-2 transition-colors">
-                                    <Icon name="Calculator" size={18} /> + Działania Matematyczne
-                                </button>
-                                <button onClick={addTracingBlock} className="w-full py-3 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold border border-emerald-200 flex items-center justify-center gap-2 transition-colors">
-                                    <Icon name="Type" size={18} /> + Pisanie po śladzie (Szlaczki)
-                                </button>
-                                <button onClick={addSpacer} className="w-full py-3 px-4 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-xl font-bold border border-gray-200 flex items-center justify-center gap-2 transition-colors">
-                                     + Puste miejsce (Odstęp)
-                                </button>
+                                <input type="text" value={headerData.school} onChange={e => updateHeader('school', e.target.value)} placeholder="Przedszkole / Szkoła..." className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none" />
+                                <input type="text" value={headerData.name} onChange={e => updateHeader('name', e.target.value)} placeholder="Miejsce na Imię..." className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none" />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input type="text" value={headerData.date} onChange={e => updateHeader('date', e.target.value)} placeholder="Data..." className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none" />
+                                    <input type="text" value={headerData.group} onChange={e => updateHeader('group', e.target.value)} placeholder="Grupa..." className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Główny Tytuł (Temat)</label>
+                                    <input type="text" value={headerData.title} onChange={e => updateHeader('title', e.target.value.toUpperCase())} className="w-full mt-1 p-3 bg-indigo-50 border border-indigo-100 rounded-xl outline-none font-black text-center text-indigo-900" />
+                                </div>
+                                <input type="text" value={headerData.goal} onChange={e => updateHeader('goal', e.target.value)} placeholder="Cel zajęć (dla n-la)..." className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none" />
                             </div>
 
-                            {/* Moduł AI */}
+                            {/* DODAWANIE BLOKÓW */}
+                            <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 space-y-3 relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-sky-500"></div>
+                                <h2 className="font-bold flex items-center text-gray-800 text-sm uppercase tracking-widest mb-4"><Icon name="Layout" size={18} className="mr-2 text-sky-500"/> Zbuduj Kartę Pracy</h2>
+                                
+                                <button onClick={addInstruction} className="w-full py-2 px-4 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl font-bold border border-gray-200 flex items-center justify-start gap-3 transition-colors text-sm">
+                                    <Icon name="Text" size={16} className="text-gray-400" /> Dodaj Instrukcję / Polecenie
+                                </button>
+                                <button onClick={addImageMath} className="w-full py-2 px-4 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl font-bold border border-amber-200 flex items-center justify-start gap-3 transition-colors text-sm">
+                                    <Icon name="Image" size={16} className="text-amber-500" /> Matematyka Obrazkowa (Przedszkole)
+                                </button>
+                                <button onClick={addMatch} className="w-full py-2 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold border border-indigo-200 flex items-center justify-start gap-3 transition-colors text-sm">
+                                    <Icon name="Link" size={16} className="text-indigo-500" /> Połącz w pary (Dopasuj)
+                                </button>
+                                <button onClick={addMath} className="w-full py-2 px-4 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-xl font-bold border border-sky-200 flex items-center justify-start gap-3 transition-colors text-sm">
+                                    <Icon name="Calculator" size={16} className="text-sky-500" /> Działania na liczbach (Klasy 1-3)
+                                </button>
+                                <button onClick={addTracing} className="w-full py-2 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold border border-emerald-200 flex items-center justify-start gap-3 transition-colors text-sm">
+                                    <Icon name="Type" size={16} className="text-emerald-500" /> Szlaczki / Pisanie po śladzie
+                                </button>
+                                <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-gray-100">
+                                    <button onClick={addMotivation} className="py-2 px-2 bg-pink-50 hover:bg-pink-100 text-pink-700 rounded-xl font-bold border border-pink-200 flex items-center justify-center gap-1 transition-colors text-xs">
+                                        <Icon name="Star" size={14} /> Ocena/Naklejka
+                                    </button>
+                                    <button onClick={addSpacer} className="py-2 px-2 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-xl font-bold border border-gray-200 flex items-center justify-center gap-1 transition-colors text-xs">
+                                        + Odstęp
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* KOLOROWANKI AI */}
                             <div className="bg-gradient-to-br from-purple-50 to-white p-5 rounded-3xl shadow-sm border border-purple-100 space-y-4 relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
                                 <h2 className="font-bold flex items-center text-purple-900 text-sm uppercase tracking-widest"><Icon name="Sparkles" size={18} className="mr-2 text-purple-500"/> Kolorowanka AI</h2>
@@ -255,26 +272,21 @@
                                         <div className="mx-auto w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-500 mb-2">
                                             <Icon name="Lock" size={20} />
                                         </div>
-                                        <p className="text-xs text-purple-700 font-medium">Funkcja odblokowana tylko dla posiadaczy Kodu Premium (Postaw Kawę).</p>
+                                        <p className="text-xs text-purple-700 font-medium">Funkcja tylko dla posiadaczy Kodu Premium (Postaw Kawę).</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
                                         <textarea 
                                             value={aiPrompt} 
                                             onChange={e => setAiPrompt(e.target.value)} 
-                                            placeholder="Wpisz po polsku co ma być na kolorowance (np. Wesoły miś z balonikiem, pszczoła na kwiatku)..." 
+                                            placeholder="Wpisz co ma być na kolorowance (np. Ziemia z uśmiechem)..." 
                                             className="w-full p-3 border border-purple-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-100 bg-white resize-none"
-                                            rows="3"
+                                            rows="2"
                                         />
                                         <button onClick={handleGenerateAiImage} disabled={isGenerating} className="w-full bg-purple-600 text-white px-4 py-3 rounded-xl font-bold shadow-md hover:bg-purple-700 disabled:bg-gray-400 transition-colors flex items-center justify-center space-x-2">
-                                            {isGenerating ? <span>⏳ Rysowanie (Czekaj)...</span> : <><Icon name="Sparkles" size={18}/><span>Dodaj Kolorowankę</span></>}
+                                            {isGenerating ? <span>⏳ Rysowanie...</span> : <><Icon name="Sparkles" size={18}/><span>Dodaj Kolorowankę</span></>}
                                         </button>
-                                        {aiError && (
-                                            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs text-center mt-2">
-                                                {aiError}
-                                            </div>
-                                        )}
-                                        <p className="text-[10px] text-purple-400/80 text-center leading-tight">Uwaga: Obrazek wygeneruje się czarno-biały, idealny do pokolorowania przez dzieci.</p>
+                                        {aiError && <div className="p-2 bg-red-50 border border-red-200 rounded-xl text-red-700 text-[10px] text-center mt-2">{aiError}</div>}
                                     </div>
                                 )}
                             </div>
@@ -284,26 +296,29 @@
                             </button>
                         </div>
 
-                        {/* Obszar Podglądu (Karta A4) */}
+                        {/* PODGLĄD KARTY PRACY (A4) */}
                         <div className="lg:col-span-8 flex justify-center items-start print:static overflow-x-auto pb-10">
                             
                             <div 
                                 id="print-area"
-                                className="relative bg-white w-full max-w-[210mm] aspect-[1/1.414] rounded-sm shadow-2xl p-10 md:p-16 flex flex-col print:shadow-none print:w-[210mm] print:h-[297mm] print:p-12 overflow-hidden"
+                                className="relative bg-white w-full max-w-[210mm] min-h-[297mm] rounded-sm shadow-2xl p-8 md:p-12 flex flex-col print:shadow-none print:w-[210mm] print:h-[297mm] print:p-8 overflow-hidden text-gray-900"
                             >
-                                {/* KROPKOWANA LINIA CIĘCIA TŁA */}
-                                <div className="absolute inset-8 border-2 border-dashed border-gray-200 pointer-events-none z-0 opacity-50"></div>
-
-                                {/* Znak wodny */}
-                                {!isPremium && <div className="absolute inset-0 z-0 flex items-center justify-center opacity-[0.03] rotate-[-35deg] text-6xl font-black uppercase pointer-events-none select-none tracking-[1rem]">EDUKARTY AI</div>}
-
-                                <div className="relative z-10 flex-shrink-0 mb-8 border-b-2 border-gray-800 pb-6">
-                                    <h1 className="text-3xl md:text-4xl font-black text-center text-gray-900 tracking-wider uppercase mb-4">{worksheetTitle}</h1>
-                                    <h2 className="text-sm md:text-base text-right text-gray-600 font-medium">{worksheetSubtitle}</h2>
+                                {/* NAGŁÓWEK */}
+                                <div className="border-b-2 border-gray-800 pb-4 mb-6">
+                                    <div className="flex justify-between text-[11px] md:text-sm font-semibold mb-2">
+                                        <span>{headerData.school}</span>
+                                        <span>{headerData.name}</span>
+                                    </div>
+                                    <div className="flex justify-between text-[11px] md:text-sm font-semibold mb-6">
+                                        <span>{headerData.date}</span>
+                                        <span>{headerData.group}</span>
+                                    </div>
+                                    <h1 className="text-2xl md:text-3xl font-black text-center tracking-wider uppercase mb-2">{headerData.title}</h1>
+                                    <p className="text-[10px] md:text-xs text-gray-500 text-center italic">{headerData.goal}</p>
                                 </div>
 
-                                {/* BLOKI KARTY PRACY */}
-                                <div className="relative z-10 flex-1 flex flex-col gap-6">
+                                {/* BLOKI */}
+                                <div className="flex-1 flex flex-col gap-5">
                                     {elements.length === 0 && (
                                         <div className="flex-1 flex items-center justify-center border-4 border-dashed border-gray-100 rounded-2xl print-hidden">
                                             <p className="text-gray-400 font-bold text-center px-6">Dodaj moduły z panelu po lewej stronie,<br/>aby zbudować kartę pracy.</p>
@@ -311,48 +326,120 @@
                                     )}
 
                                     {elements.map((el, index) => (
-                                        <div key={el.id} className="relative group p-2 -mx-2 hover:bg-gray-50/50 rounded-xl transition-colors border border-transparent hover:border-gray-100">
+                                        <div key={el.id} className="relative group p-2 -mx-2 hover:bg-gray-50/50 rounded-xl transition-colors border border-transparent hover:border-gray-100 page-break-inside-avoid">
                                             
-                                            {/* Przycisk Usuń (Tylko na najechanie) */}
                                             <button onClick={() => removeElement(el.id)} className="absolute -right-2 -top-2 print-hidden opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 text-white rounded-full p-2 shadow-md transition-all z-50">
                                                 <Icon name="Trash2" size={14}/>
                                             </button>
 
-                                            {/* RENDEROWANIE BLOKÓW */}
+                                            {/* 1. INSTRUKCJA */}
+                                            {el.type === 'instruction' && (
+                                                <div className="w-full">
+                                                    <input 
+                                                        type="text" 
+                                                        value={el.text} 
+                                                        onChange={(e) => updateElement(el.id, 'text', e.target.value)}
+                                                        className="w-full text-sm md:text-base font-bold bg-transparent outline-none border-none placeholder-gray-300"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* 2. MATEMATYKA OBRAZKOWA (Przedszkole) */}
+                                            {el.type === 'image_math' && (
+                                                <div className="flex items-center justify-between bg-white p-4 rounded-xl border-2 border-gray-100 print:border-gray-300 print:bg-transparent">
+                                                    <div className="flex items-center flex-1 flex-wrap">
+                                                        <div className="flex items-center">{renderImageMathIcons(el.icon, el.eq1)}</div>
+                                                        <span className="text-4xl mx-4 font-black text-gray-800">{el.op}</span>
+                                                        <div className="flex items-center">{renderImageMathIcons(el.icon, el.eq2)}</div>
+                                                        <span className="text-4xl mx-4 font-black text-gray-800">=</span>
+                                                    </div>
+                                                    <div className="w-16 h-16 md:w-20 md:h-20 border-4 border-dashed border-gray-300 rounded-xl"></div>
+                                                    
+                                                    {/* Opcje edycji tylko na ekranie */}
+                                                    <div className="absolute -top-4 right-8 bg-white border border-gray-200 rounded-lg p-1 shadow-sm flex gap-1 print-hidden opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                                        <input type="text" value={el.icon} onChange={e => updateElement(el.id, 'icon', e.target.value)} className="w-8 text-center text-sm border bg-gray-50 rounded" maxLength="2"/>
+                                                        <input type="number" value={el.eq1} onChange={e => updateElement(el.id, 'eq1', Number(e.target.value))} className="w-10 text-center text-sm border bg-gray-50 rounded" min="1" max="10"/>
+                                                        <select value={el.op} onChange={e => updateElement(el.id, 'op', e.target.value)} className="w-10 text-center text-sm border bg-gray-50 rounded"><option>+</option><option>-</option></select>
+                                                        <input type="number" value={el.eq2} onChange={e => updateElement(el.id, 'eq2', Number(e.target.value))} className="w-10 text-center text-sm border bg-gray-50 rounded" min="1" max="10"/>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* 3. POŁĄCZ W PARY */}
+                                            {el.type === 'match' && (
+                                                <div className="flex justify-between items-center w-full px-8 md:px-16 py-4">
+                                                    <div className="flex flex-col gap-6 w-1/3">
+                                                        {el.pairs.map((pair, i) => (
+                                                            <div key={`l-${i}`} className="flex items-center justify-between">
+                                                                <input type="text" value={pair.l} onChange={e => updateElement(el.id, 'pairs', e.target.value, i, 'l')} className="kids-font text-lg md:text-xl bg-transparent outline-none w-full text-center border-b border-transparent hover:border-gray-200 focus:border-gray-400 print:border-transparent"/>
+                                                                <div className="w-4 h-4 bg-gray-800 rounded-full ml-4 flex-shrink-0"></div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="flex flex-col gap-6 w-1/3">
+                                                        {el.pairs.map((pair, i) => (
+                                                            <div key={`r-${i}`} className="flex items-center justify-between">
+                                                                <div className="w-4 h-4 bg-gray-800 rounded-full mr-4 flex-shrink-0"></div>
+                                                                <input type="text" value={pair.r} onChange={e => updateElement(el.id, 'pairs', e.target.value, i, 'r')} className="kids-font text-lg md:text-xl bg-transparent outline-none w-full text-center border-b border-transparent hover:border-gray-200 focus:border-gray-400 print:border-transparent"/>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* 4. MATEMATYKA ZWYKŁA */}
                                             {el.type === 'math' && (
-                                                <div className="flex justify-between items-center px-4 py-2">
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-4 py-2">
                                                     {el.data.map((eq, i) => (
-                                                        <div key={i} className="math-text text-xl md:text-2xl">{eq}</div>
+                                                        <div key={i} className="math-text text-xl md:text-2xl text-center">{eq}</div>
                                                     ))}
                                                 </div>
                                             )}
 
+                                            {/* 5. SZLACZKI */}
                                             {el.type === 'tracing' && (
-                                                <div className="w-full text-center">
+                                                <div className="w-full text-center my-2">
                                                     <input 
                                                         type="text" 
                                                         value={el.text} 
-                                                        onChange={(e) => updateElementText(el.id, e.target.value.toUpperCase())}
-                                                        className="tracing-text w-full text-center text-3xl md:text-5xl bg-transparent outline-none border-none placeholder-gray-200"
+                                                        onChange={(e) => updateElement(el.id, 'text', e.target.value.toUpperCase())}
+                                                        className="tracing-text w-full text-center text-4xl md:text-5xl bg-transparent outline-none border-b-2 border-dashed border-gray-300 placeholder-gray-200 pb-2"
                                                         placeholder="WPISZ TEKST"
                                                     />
                                                 </div>
                                             )}
 
+                                            {/* 6. KOLOROWANKA AI */}
                                             {el.type === 'ai_image' && (
                                                 <div className="w-full flex justify-center py-2">
                                                     <img 
                                                         src={el.src} 
                                                         alt="Kolorowanka" 
-                                                        className="max-h-64 object-contain mix-blend-multiply drop-shadow-sm" 
+                                                        className="max-h-64 object-contain mix-blend-multiply" 
                                                         style={{ mixBlendMode: 'multiply' }} 
                                                     />
                                                 </div>
                                             )}
 
+                                            {/* 7. OCENA / NAKLEJKA */}
+                                            {el.type === 'motivation' && (
+                                                <div className="flex flex-col items-center justify-center mt-6 p-4">
+                                                    <input 
+                                                        type="text" 
+                                                        value={el.text} 
+                                                        onChange={(e) => updateElement(el.id, 'text', e.target.value)}
+                                                        className="kids-font text-lg md:text-xl text-center w-full bg-transparent outline-none mb-4 font-bold text-indigo-900"
+                                                    />
+                                                    <div className="w-24 h-24 border-4 border-dashed border-gray-300 rounded-full flex items-center justify-center text-[10px] text-gray-400 font-bold uppercase text-center p-2">
+                                                        Miejsce na<br/>naklejkę
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* 8. ODSTĘP */}
                                             {el.type === 'spacer' && (
-                                                <div className="w-full h-16 border-2 border-dashed border-gray-200/50 rounded-lg flex items-center justify-center print:border-none print:h-24">
-                                                    <span className="text-gray-300 text-xs font-bold uppercase tracking-widest print-hidden">Puste miejsce</span>
+                                                <div className="w-full h-8 flex items-center justify-center print:h-12">
+                                                    <span className="text-gray-200 text-[10px] uppercase tracking-widest print-hidden">-- Odstęp --</span>
                                                 </div>
                                             )}
 
