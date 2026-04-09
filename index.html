@@ -11,19 +11,17 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&family=Montserrat:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Comic+Neue:wght@400;700&family=Montserrat:wght@400;700;900&family=Pangolin&family=Patrick+Hand&display=swap');
         
         body { background-color: #f8fafc; font-family: 'Montserrat', sans-serif; }
         
         .tracing-text {
-            font-family: 'Comic Neue', cursive;
             color: transparent;
             -webkit-text-stroke: 1.5px #94a3b8;
             letter-spacing: 0.2em;
         }
 
         .math-text, .kids-font {
-            font-family: 'Comic Neue', cursive;
             font-weight: bold;
             color: #1e293b;
         }
@@ -104,6 +102,15 @@
                 title: 'DZIEŃ ZIEMI - DBAMY O PLANETĘ',
                 goal: 'Cel: Poznanie sposobów dbania o Ziemię, ćwiczenie liczenia i motoryki małej.'
             });
+
+            // --- WYBÓR CZCIONKI DLA DZIECI ---
+            const [cardFont, setCardFont] = useState("'Comic Neue', cursive");
+            const fontOptions = [
+                { id: "'Comic Neue', cursive", name: 'Comic Neue (Radosna)' },
+                { id: "'Patrick Hand', cursive", name: 'Patrick Hand (Wyraźna/Elementarz)' },
+                { id: "'Pangolin', cursive", name: 'Pangolin (Dziecięca)' },
+                { id: "'Caveat', cursive", name: 'Caveat (Odręczna)' }
+            ];
             
             // --- ELEMENTY (BLOKI) KARTY ---
             const [elements, setElements] = useState([
@@ -230,6 +237,16 @@
                                     <input type="text" value={headerData.date} onChange={e => updateHeader('date', e.target.value)} placeholder="Data..." className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none" />
                                     <input type="text" value={headerData.group} onChange={e => updateHeader('group', e.target.value)} placeholder="Grupa..." className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none" />
                                 </div>
+                                
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Czcionka zadań</label>
+                                    <select value={cardFont} onChange={e => setCardFont(e.target.value)} className="w-full mt-1 p-2 bg-white border border-gray-200 rounded-lg text-xs outline-none font-bold text-gray-700 cursor-pointer shadow-sm focus:border-orange-400 transition-colors">
+                                        {fontOptions.map(font => (
+                                            <option key={font.id} value={font.id}>{font.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
                                 <div>
                                     <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Główny Tytuł (Temat)</label>
                                     <input type="text" value={headerData.title} onChange={e => updateHeader('title', e.target.value.toUpperCase())} className="w-full mt-1 p-3 bg-indigo-50 border border-indigo-100 rounded-xl outline-none font-black text-center text-indigo-900" />
@@ -345,6 +362,7 @@
                                                         value={el.text} 
                                                         onChange={(e) => updateElement(el.id, 'text', e.target.value)}
                                                         className="w-full text-sm md:text-base font-bold bg-transparent outline-none border-none placeholder-gray-300"
+                                                        style={{ fontFamily: cardFont }}
                                                     />
                                                 </div>
                                             )}
@@ -352,7 +370,7 @@
                                             {/* 2. MATEMATYKA OBRAZKOWA (Przedszkole) */}
                                             {el.type === 'image_math' && (
                                                 <div className="flex items-center justify-between bg-white p-4 rounded-xl border-2 border-gray-100 print:border-gray-300 print:bg-transparent">
-                                                    <div className="flex items-center flex-1 flex-wrap">
+                                                    <div className="flex items-center flex-1 flex-wrap" style={{ fontFamily: cardFont }}>
                                                         <div className="flex items-center">{renderImageMathIcons(el.icon, el.eq1)}</div>
                                                         <span className="text-4xl mx-4 font-black text-gray-800">{el.op}</span>
                                                         <div className="flex items-center">{renderImageMathIcons(el.icon, el.eq2)}</div>
@@ -376,7 +394,7 @@
                                                     <div className="flex flex-col gap-6 w-1/3">
                                                         {el.pairs.map((pair, i) => (
                                                             <div key={`l-${i}`} className="flex items-center justify-between">
-                                                                <input type="text" value={pair.l} onChange={e => updateElement(el.id, 'pairs', e.target.value, i, 'l')} className="kids-font text-lg md:text-xl bg-transparent outline-none w-full text-center border-b border-transparent hover:border-gray-200 focus:border-gray-400 print:border-transparent"/>
+                                                                <input type="text" value={pair.l} onChange={e => updateElement(el.id, 'pairs', e.target.value, i, 'l')} className="kids-font text-lg md:text-xl bg-transparent outline-none w-full text-center border-b border-transparent hover:border-gray-200 focus:border-gray-400 print:border-transparent" style={{ fontFamily: cardFont }}/>
                                                                 <div className="w-4 h-4 bg-gray-800 rounded-full ml-4 flex-shrink-0"></div>
                                                             </div>
                                                         ))}
@@ -385,7 +403,7 @@
                                                         {el.pairs.map((pair, i) => (
                                                             <div key={`r-${i}`} className="flex items-center justify-between">
                                                                 <div className="w-4 h-4 bg-gray-800 rounded-full mr-4 flex-shrink-0"></div>
-                                                                <input type="text" value={pair.r} onChange={e => updateElement(el.id, 'pairs', e.target.value, i, 'r')} className="kids-font text-lg md:text-xl bg-transparent outline-none w-full text-center border-b border-transparent hover:border-gray-200 focus:border-gray-400 print:border-transparent"/>
+                                                                <input type="text" value={pair.r} onChange={e => updateElement(el.id, 'pairs', e.target.value, i, 'r')} className="kids-font text-lg md:text-xl bg-transparent outline-none w-full text-center border-b border-transparent hover:border-gray-200 focus:border-gray-400 print:border-transparent" style={{ fontFamily: cardFont }}/>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -396,7 +414,7 @@
                                             {el.type === 'math' && (
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-4 py-2">
                                                     {el.data.map((eq, i) => (
-                                                        <div key={i} className="math-text text-xl md:text-2xl text-center">{eq}</div>
+                                                        <div key={i} className="math-text text-xl md:text-2xl text-center" style={{ fontFamily: cardFont }}>{eq}</div>
                                                     ))}
                                                 </div>
                                             )}
@@ -410,6 +428,7 @@
                                                         onChange={(e) => updateElement(el.id, 'text', e.target.value.toUpperCase())}
                                                         className="tracing-text w-full text-center text-4xl md:text-5xl bg-transparent outline-none border-b-2 border-dashed border-gray-300 placeholder-gray-200 pb-2"
                                                         placeholder="WPISZ TEKST"
+                                                        style={{ fontFamily: cardFont }}
                                                     />
                                                 </div>
                                             )}
@@ -434,6 +453,7 @@
                                                         value={el.text} 
                                                         onChange={(e) => updateElement(el.id, 'text', e.target.value)}
                                                         className="kids-font text-lg md:text-xl text-center w-full bg-transparent outline-none mb-4 font-bold text-indigo-900"
+                                                        style={{ fontFamily: cardFont }}
                                                     />
                                                     <div className="w-24 h-24 border-4 border-dashed border-gray-300 rounded-full flex items-center justify-center text-[10px] text-gray-400 font-bold uppercase text-center p-2">
                                                         Miejsce na<br/>naklejkę
