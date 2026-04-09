@@ -71,23 +71,6 @@
             );
         };
 
-        const fetchImageWithRetry = async (url, maxRetries = 3) => {
-            for (let i = 0; i < maxRetries; i++) {
-                try {
-                    const response = await fetch(url, { cache: "no-store" });
-                    if (response.ok) {
-                        return await response.blob();
-                    } else {
-                        console.warn(`Próba ${i + 1}: Serwer AI zablokował zapytanie.`);
-                    }
-                } catch (error) {
-                    console.warn(`Próba ${i + 1}: Błąd połączenia internetowego.`);
-                }
-                if (i < maxRetries - 1) await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-            throw new Error("Serwer AI jest przeciążony. Spróbuj ponownie.");
-        };
-
         function App() {
             const [isPremium, setIsPremium] = useState(false);
             const [accessCode, setAccessCode] = useState('');
@@ -157,12 +140,13 @@
             const addMotivation = () => setElements([...elements, { id: Date.now(), type: 'motivation', text: 'Brawo! Jesteś super! ⭐' }]);
             const addSpacer = () => setElements([...elements, { id: Date.now(), type: 'spacer' }]);
 
-            // --- GENERATOR AI ---
+            // --- NOWY, SUPERSZYBKI GENERATOR AI (Przez API Vercela / FAL) ---
             const handleGenerateAiImage = async () => {
                 if (!aiPrompt.trim()) return;
                 setIsGenerating(true); setAiError(null);
-                let translatedPrompt = aiPrompt;
                 
+                let translatedPrompt = aiPrompt;
+                // Tłumaczenie na angielski
                 try {
                     const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(aiPrompt)}&langpair=pl|en`);
                     const data = await res.json();
@@ -171,22 +155,33 @@
                     }
                 } catch(e) {}
 
+                // Wymuszenie stylu kolorowanki czarno-białej
                 const fullPrompt = `${translatedPrompt}, black and white coloring page for kids, line art, simple outlines, pure white background, no shading, monochrome`;
                 
                 try {
-                    const seed = Math.floor(Math.random() * 1000000);
-                    const encodedPrompt = encodeURIComponent(fullPrompt);
-                    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&seed=${seed}&model=flux&r=${Date.now()}`;
+                    // Pukamy do naszego nowego "Niewidzialnego Kelnera" (pliku api/generate.js)
+                    const response = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ prompt: fullPrompt })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Błąd podczas łączenia z wewnętrznym API.");
+                    }
+
+                    const data = await response.json();
                     
-                    const blob = await fetchImageWithRetry(imageUrl, 3);
-                    const objectUrl = URL.createObjectURL(blob);
-                    
-                    setElements([...elements, { id: Date.now(), type: 'ai_image', src: objectUrl }]);
+                    // Sukces! Otrzymaliśmy obrazek z FAL
+                    setElements([...elements, { id: Date.now(), type: 'ai_image', src: data.imageUrl }]);
                     setAiPrompt('');
                     setIsGenerating(false);
                 } catch (e) { 
                     setIsGenerating(false);
-                    setAiError("Darmowe serwery są w tej chwili obciążone. Odczekaj 10 sekund i spróbuj ponownie!");
+                    console.error(e);
+                    setAiError("Błąd: Sprawdź czy poprawnie wkleiłeś FAL_KEY w ustawieniach na Vercelu i czy posiadasz plik /api/generate.js!");
                 }
             };
 
@@ -203,7 +198,7 @@
                     <nav className="bg-white border-b px-8 py-4 flex justify-between items-center print-hidden sticky top-0 z-50 shadow-sm">
                         <div className="flex items-center space-x-3 font-black text-2xl tracking-tight">
                             <div className="bg-gradient-to-br from-amber-400 to-orange-500 p-2.5 rounded-xl text-white shadow-lg"><Icon name="Layout" size={24}/></div>
-                            <span className="text-gray-800">Edu<span className="text-orange-500">Karty</span> <span className="text-xs text-orange-600 ml-1 font-bold bg-orange-50 px-2 py-1 rounded-md border border-orange-200">v3.1 Standard MEN</span></span>
+                            <span className="text-gray-800">Edu<span className="text-orange-500">Karty</span> <span className="text-xs text-orange-600 ml-1 font-bold bg-orange-50 px-2 py-1 rounded-md border border-orange-200">PRO AI</span></span>
                         </div>
                         <div className="flex items-center space-x-4">
                             <button onClick={() => setShowInstructions(true)} className="flex items-center space-x-2 text-orange-600 hover:bg-orange-50 px-4 py-2 rounded-xl font-bold transition-colors">
@@ -306,7 +301,7 @@
                                             rows="2"
                                         />
                                         <button onClick={handleGenerateAiImage} disabled={isGenerating} className="w-full bg-purple-600 text-white px-4 py-3 rounded-xl font-bold shadow-md hover:bg-purple-700 disabled:bg-gray-400 transition-colors flex items-center justify-center space-x-2">
-                                            {isGenerating ? <span>⏳ Rysowanie...</span> : <><Icon name="Sparkles" size={18}/><span>Dodaj Kolorowankę</span></>}
+                                            {isGenerating ? <span>⏳ Rysowanie błyskawiczne...</span> : <><Icon name="Sparkles" size={18}/><span>Dodaj Kolorowankę</span></>}
                                         </button>
                                         {aiError && <div className="p-2 bg-red-50 border border-red-200 rounded-xl text-red-700 text-[10px] text-center mt-2">{aiError}</div>}
                                     </div>
@@ -489,7 +484,7 @@
                                     
                                     <div className="space-y-3">
                                         <h3 className="font-bold text-gray-900 text-lg border-b pb-1">Krok 1: Nagłówek i Dane</h3>
-                                        <p>Zacznij od panelu po lewej stronie. Wypełnij nazwę placówki, datę oraz główny tytuł. Te dane automatycznie pojawią się na górze Twojej karty pracy.</p>
+                                        <p>Zacznij od panelu po lewej stronie. Wypełnij nazwę placówki, datę oraz główny tytuł. Wybierz też czcionkę – te dane automatycznie pojawią się na górze Twojej karty pracy.</p>
                                     </div>
 
                                     <div className="space-y-3">
@@ -509,7 +504,7 @@
 
                                     <div className="space-y-3">
                                         <h3 className="font-bold text-gray-900 text-lg border-b pb-1">Krok 4: Magia AI (Kolorowanki bez tła)</h3>
-                                        <p>Jeśli posiadasz Kod Premium, w dolnej części panelu możesz poprosić Sztuczną Inteligencję o narysowanie dowolnej kolorowanki. System wklei ją na kartę w taki sposób, że jej białe tło stanie się przezroczyste (nie zasłoni innych zadań!).</p>
+                                        <p>Jeśli posiadasz Kod Premium, w dolnej części panelu możesz poprosić Sztuczną Inteligencję o narysowanie dowolnej kolorowanki. System połączy się z prywatnym serwerem i w 3 sekundy wklei gotowy obrazek prosto na Twoją kartę pracy!</p>
                                     </div>
 
                                     <div className="space-y-3">
